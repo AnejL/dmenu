@@ -44,6 +44,10 @@ static struct item *items = NULL;
 static struct item *matches, *matchend;
 static struct item *prev, *curr, *next, *sel;
 static int mon = -1, screen;
+static int dmx = 0; /* put dmenu at this x offset */
+static int dmy = 0; /* put dmenu at this y offset (measured from the bottom if topbar is 0) */
+static int centered = 0; /* put dmenu in center if this is set */
+static unsigned int dmw = 0; /* make dmenu this wide */
 
 static Atom clip, utf8;
 static Display *dpy;
@@ -648,9 +652,12 @@ setup(void)
 				if (INTERSECT(x, y, 1, 1, info[i]))
 					break;
 
-		x = info[i].x_org;
-		y = info[i].y_org + (topbar ? 0 : info[i].height - mh);
-		mw = info[i].width;
+		mw = (dmw>0 ? dmw : info[i].width);
+		if (centered)
+			x = info[i].x_org + ((info[i].width  - mw) / 2);
+		else
+			x = info[i].x_org + dmx;
+		y = info[i].y_org + (topbar ? dmy : info[i].height - mh - dmy);
 		XFree(info);
 	} else
 #endif
@@ -658,9 +665,13 @@ setup(void)
 		if (!XGetWindowAttributes(dpy, parentwin, &wa))
 			die("could not get embedding window attributes: 0x%lx",
 			    parentwin);
-		x = 0;
-		y = topbar ? 0 : wa.height - mh;
-		mw = wa.width;
+		
+		mw = (dmw>0 ? dmw : wa.width);
+		if (centered)
+			x = (wa.width  - mw) / 2;
+		else
+			x = dmx;
+		y = topbar ? dmy : wa.height - mh - dmy;
 	}
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 	inputw = MIN(inputw, mw/3);
@@ -701,7 +712,8 @@ static void
 usage(void)
 {
 	fputs("usage: dmenu [-bfivP] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
-	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
+	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n"
+		  "				[-x xoffset] [-y yoffset] [-w width]\n", stderr);
 	exit(1);
 }
 
@@ -725,11 +737,19 @@ main(int argc, char *argv[])
 			fstrstr = cistrstr;
 		} else if (!strcmp(argv[i], "-P"))   /* is the input a password */
 		    passwd = 1;
+		else if (!strcmp(argv[i], "-c"))
+			centered = 1;
 		else if (i + 1 == argc)
 			usage();
 		/* these options take one argument */
 		else if (!strcmp(argv[i], "-l"))   /* number of lines in vertical list */
 			lines = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-x"))   /* window x offset */
+			dmx = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-y"))   /* window y offset (from bottom up if -b) */
+			dmy = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-w"))   /* make dmenu this wide */
+			dmw = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-m"))
 			mon = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-p"))   /* adds prompt to left of input field */
